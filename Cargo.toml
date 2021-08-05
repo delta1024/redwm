@@ -1,0 +1,18 @@
+[package]
+name = "redwm"
+version = "0.0.1"
+edition = "2018"
+license = "GPL-3.0"
+description = "a awesomwm / xmonad inspired wm in rust"
+readme = "README.md"
+repository = "https://github.com/delta1024/redwm"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "redwm"
+path = "src/lib.rs"
+crate-type = ["lib"]
+
+[dependencies]
+x11rb = { version = "*", features = ["all-extensions"] }
