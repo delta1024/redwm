@@ -1,11 +1,6 @@
-//! Holds the Window Manager State
-use x11rb::CURRENT_TIME;
 use crate::{
-    define_window_event_request,
-    imports::*,
-    match_event_request,
-    traits::*,
-    RedWindow, TITLEBAR_HEIGHT, DRAG_BUTTON,
+    define_window_event_request, imports::*, match_event_request, traits::*,
+    DRAG_BUTTON, TITLEBAR_HEIGHT,
 };
 use std::cell::RefCell;
 use std::cmp::Reverse;
@@ -13,8 +8,10 @@ use std::collections::BinaryHeap;
 use std::collections::HashSet;
 use std::rc::Rc;
 use x11rb::COPY_DEPTH_FROM_PARENT;
+use x11rb::CURRENT_TIME;
 
 #[derive(Debug)]
+/// Holds the Window Manager State
 pub struct RedWm<'a, C>
 where
     C: Connection + Send + Sync,
@@ -33,15 +30,18 @@ where
     wm_delete_window: Atom,
 }
 
-impl<'a, C: 'static + Connection + Send + Sync> RedWm<'a, C> {
+impl<'a, C> RedWm<'a, C>
+where
+    C: 'static + Connection + Send + Sync,
+{
     pub fn new(conn: Rc<RefCell<&'a C>>, screen_num: usize) -> WmReply<Self> {
-        let gc;
-	let wm_protocols;
-	let wm_delete_window;
+        let black_gc;
+        let wm_protocols;
+        let wm_delete_window;
         {
             let conn = conn.borrow();
             let screen = &conn.setup().roots[screen_num];
-            gc = conn.generate_id()?;
+            black_gc = conn.generate_id()?;
             let font = conn.generate_id()?;
             conn.open_font(font, b"9x15")?;
 
@@ -50,32 +50,35 @@ impl<'a, C: 'static + Connection + Send + Sync> RedWm<'a, C> {
                 .background(screen.white_pixel)
                 .foreground(screen.black_pixel)
                 .font(font);
-            conn.create_gc(gc, screen.root, &gc_aux)?;
+            conn.create_gc(black_gc, screen.root, &gc_aux)?;
             conn.close_font(font)?;
-	    wm_protocols = conn.intern_atom(false, b"WM_PROTOCOLS")?;
-	    wm_delete_window = conn.intern_atom(false, b"WM_DELETE_WINDOW")?;
+            wm_protocols = conn.intern_atom(false, b"WM_PROTOCOLS")?;
+            wm_delete_window = conn.intern_atom(false, b"WM_DELETE_WINDOW")?;
         }
 
         let redwm = RedWm {
             conn,
             screen_num,
-            black_gc: gc,
+            black_gc,
             pending_exposure: HashSet::default(),
             sequences_to_ignore: BinaryHeap::default(),
             windows: Vec::default(),
-	    drag_window: Option::default(),
-	    wm_protocols: wm_protocols.reply()?.atom,
-	    wm_delete_window: wm_delete_window.reply()?.atom,
+            drag_window: Option::default(),
+            wm_protocols: wm_protocols.reply()?.atom,
+            wm_delete_window: wm_delete_window.reply()?.atom,
         };
 
         Ok(redwm)
     }
 }
 
-impl<C: Connection + Send + Sync> X11Connection for RedWm<'_, C> {
+impl<C> X11Connection for RedWm<'_, C>
+where
+    C: Connection + Send + Sync,
+{
     fn get_screen<'c>(&'c self) -> WmReply<&'c Screen> {
         let screen;
-        {
+       {
             let s = self.conn.borrow();
             screen = &s.setup().roots[self.screen_num];
         }
@@ -154,7 +157,6 @@ impl<C: Connection + Send + Sync> X11Connection for RedWm<'_, C> {
         let screen = self.get_screen()?;
         assert!(self.find_window_by_id(win).is_none());
 
-
         let conn = self.conn.borrow_mut();
 
         let frame_win = conn.generate_id()?;
@@ -194,7 +196,10 @@ impl<C: Connection + Send + Sync> X11Connection for RedWm<'_, C> {
     }
 }
 
-impl<C: Connection + Send + Sync> ManageWindows for RedWm<'_, C> {
+impl<C> ManageWindows for RedWm<'_, C>
+where
+    C: Connection + Send + Sync,
+{
     fn find_window_by_id(&self, win: Window) -> Option<&RedWindow> {
         self.windows
             .iter()
@@ -241,7 +246,10 @@ impl<C: Connection + Send + Sync> ManageWindows for RedWm<'_, C> {
     }
 }
 
-impl<C: Connection + Send + Sync> HandleEvent for RedWm<'_, C> {
+impl<C> HandleEvent for RedWm<'_, C>
+where
+    C: Connection + Send + Sync,
+{
     fn handle_unmap_notify(&mut self, event: UnmapNotifyEvent) -> WmReply<()> {
         let root = self.get_screen()?.root;
         let conn = self.conn.borrow();
@@ -279,64 +287,95 @@ impl<C: Connection + Send + Sync> HandleEvent for RedWm<'_, C> {
     }
 
     fn handle_expose(&mut self, event: ExposeEvent) {
-	self.pending_exposure.insert(event.window);
+        self.pending_exposure.insert(event.window);
     }
 
     fn handle_enter(&mut self, event: EnterNotifyEvent) -> WmReply<()> {
-	let conn = self.conn.borrow();
+        let conn = self.conn.borrow();
 
-	if let Some(state) = self.find_window_by_id(event.event) {
+        if let Some(state) = self.find_window_by_id(event.event) {
             // Set the input focus (ignoring ICCCM's WM_PROTOCOLS / WM_TAKE_FOCUS)
-	    conn.set_input_focus(InputFocus::PARENT, state.window, CURRENT_TIME)?;
+            conn.set_input_focus(InputFocus::PARENT, state.window, CURRENT_TIME)?;
             // Also raise the window to the top of the stacking order
-	    conn.configure_window(
-		state.frame_window,
-		&ConfigureWindowAux::new().stack_mode(StackMode::ABOVE),
-	    )?;
-	}
-	Ok(())
+            conn.configure_window(
+                state.frame_window,
+                &ConfigureWindowAux::new().stack_mode(StackMode::ABOVE),
+            )?;
+        }
+        Ok(())
     }
 
     fn handle_button_press(&mut self, event: ButtonPressEvent) {
-	if event.detail != DRAG_BUTTON  || event.state != 0 {
-	    return;
-	}
+        if event.detail != DRAG_BUTTON || event.state != 0 {
+            return;
+        }
 
-	if let Some(state) = self.find_window_by_id(event.event) {
-	    let (x, y) = (-event.event_x, -event.event_y);
-	    self.drag_window = Some((state.frame_window, (x, y)));
-	}
-	
+        if let Some(state) = self.find_window_by_id(event.event) {
+            let (x, y) = (-event.event_x, -event.event_y);
+            self.drag_window = Some((state.frame_window, (x, y)));
+        }
     }
 
     fn handle_button_release(&mut self, event: ButtonReleaseEvent) -> WmReply<()> {
-	if event.detail == DRAG_BUTTON {
-	    self.drag_window = None;
-	}
-	if let Some(state) = self.find_window_by_id(event.event) {
-	    if event.event_x >= state.close_x_position() {
-		let data = [self.wm_delete_window, 0, 0, 0, 0];
-		let event = ClientMessageEvent {
-		    response_type: CLIENT_MESSAGE_EVENT,
-		    format: 32,
-		    sequence: 0,
-		    window: state.window,
-		    type_: self.wm_protocols,
-		    data: data.into(),
-		};
-		self.conn.borrow().send_event(false, state.window, EventMask::NO_EVENT, &event)?;
-	    }
-	}
-	Ok(())
+        if event.detail == DRAG_BUTTON {
+            self.drag_window = None;
+        }
+        if let Some(state) = self.find_window_by_id(event.event) {
+            if event.event_x >= state.close_x_position() {
+                let data = [self.wm_delete_window, 0, 0, 0, 0];
+                let event = ClientMessageEvent {
+                    response_type: CLIENT_MESSAGE_EVENT,
+                    format: 32,
+                    sequence: 0,
+                    window: state.window,
+                    type_: self.wm_protocols,
+                    data: data.into(),
+                };
+                self.conn
+                    .borrow()
+                    .send_event(false, state.window, EventMask::NO_EVENT, &event)?;
+            }
+        }
+        Ok(())
     }
 
     fn handle_motion_notify(&mut self, event: MotionNotifyEvent) -> WmReply<()> {
-	if let Some((win, (x, y))) = self.drag_window {
-	    let (x, y) = (x + event.root_x, y + event.root_x);
+        if let Some((win, (x, y))) = self.drag_window {
+            let (x, y) = (x + event.root_x, y + event.root_x);
 
-	    let (x, y) =  (x as i32, y as i32);
-	    self.conn.borrow().configure_window(win, &ConfigureWindowAux::new().x(x).y(y))?;
-	}
-	Ok(())
+            let (x, y) = (x as i32, y as i32);
+            self.conn
+                .borrow()
+                .configure_window(win, &ConfigureWindowAux::new().x(x).y(y))?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+/// Holds information about the window
+pub struct RedWindow {
+    pub window: Window,
+    pub frame_window: Window,
+    pub x: i16,
+    pub y: i16,
+    pub width: u16,
+    pub height: u16,
+}
+
+impl RedWindow {
+    pub fn new(window: Window, frame_window: Window, geom: &GetGeometryReply) -> Self {
+        RedWindow {
+            window,
+            frame_window,
+            x: geom.x,
+            y: geom.y,
+            width: geom.width,
+            height: geom.height,
+        }
+    }
+
+    pub fn close_x_position(&self) -> i16 {
+        std::cmp::max(0, self.width - TITLEBAR_HEIGHT) as _
     }
 }

@@ -28,46 +28,48 @@ pub mod traits {
     pub use super::x11::traits::*;
 }
 
-pub mod errors;
-/// the window manager
-pub mod window_manager;
 /// Traits for interacting with the x11 server
 pub mod x11;
 use imports::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 use traits::*;
-use window_manager::RedWm;
-pub mod window;
+pub mod core;
 #[doc(inline)]
-pub use window::*;
+pub use crate::core as wm_core;
 
 pub const TITLEBAR_HEIGHT: u16 = 0;
 pub const DRAG_BUTTON: Button = 1;
 
-pub fn run<C: Connection + 'static + Send + Sync>(x_reply: (C, usize)) -> WmReply<()> {
+pub fn run<C>(x_reply: (C, usize)) -> WmReply<()>
+where
+    C: Connection + 'static + Send + Sync,
+{
     let (conn, screen_num) = x_reply;
     let screen = &conn.setup().roots[screen_num];
     x11::check_access(&conn, &screen)?;
     let conn = Rc::new(RefCell::new(&conn));
-    let mut wm = RedWm::new(conn, screen_num)?;
+    let mut wm = wm_core::RedWm::new(conn, screen_num)?;
     wm.scan()?;
     run_event_loop(&mut wm)?;
     Ok(())
 }
 /// Primary Event Loop
 #[allow(unreachable_code)]
-fn run_event_loop<C: Connection + Send + Sync>(wm: &mut RedWm<C>) -> WmReply<()> {
+fn run_event_loop<C>(wm: &mut wm_core::RedWm<C>) -> WmReply<()>
+where
+    C: Connection + Send + Sync,
+{
     let wm = Rc::new(RefCell::new(wm));
 
     loop {
         {
             wm.borrow_mut().refresh();
         }
-	let event;
+        let event;
         {
-	    let wm = wm.borrow();
-	    let conn = wm.conn.borrow();
+            let wm = wm.borrow();
+            let conn = wm.conn.borrow();
             conn.flush()?;
             event = conn.wait_for_event()?;
         }
@@ -82,8 +84,8 @@ fn run_event_loop<C: Connection + Send + Sync>(wm: &mut RedWm<C>) -> WmReply<()>
                 wm.borrow_mut().handle_event(event)?;
             }
             {
-		let wm = wm.borrow();
-		let conn = wm.conn.borrow();
+                let wm = wm.borrow();
+                let conn = wm.conn.borrow();
                 event_option = conn.poll_for_event()?;
             }
         }
@@ -91,7 +93,6 @@ fn run_event_loop<C: Connection + Send + Sync>(wm: &mut RedWm<C>) -> WmReply<()>
     // unreachable code
     Ok(())
 }
-
 
 #[macro_export]
 macro_rules! define_event_request {

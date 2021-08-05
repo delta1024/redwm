@@ -1,11 +1,10 @@
 use super::imports::*;
 use crate::define_event_request;
 
-
 pub mod traits {
     use crate::imports::*;
     use crate::traits::*;
-    use crate::RedWindow;
+    use crate::core::RedWindow;
 
     /// Functions for managing the X Connection
     pub trait X11Connection {
@@ -14,11 +13,7 @@ pub mod traits {
         fn get_screen<'c>(&'c self) -> WmReply<&'c Screen>;
         /// Do all the pending work that was queued while handling some events
         fn refresh(&mut self);
-        fn manage_window(
-            &mut self,
-            win: Window,
-            goem: &GetGeometryReply,
-        ) -> WmReply<()>;
+        fn manage_window(&mut self, win: Window, goem: &GetGeometryReply) -> WmReply<()>;
     }
 
     /// Functions for managing windows
