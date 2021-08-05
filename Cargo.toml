@@ -15,4 +15,4 @@ path = "src/lib.rs"
 crate-type = ["lib"]
 
 [dependencies]
-x11rb = { version = "*", features = ["all-extensions"] }
+x11rb = { version = "0.8.1", features = ["all-extensions"] }
