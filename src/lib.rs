@@ -40,6 +40,7 @@ pub use crate::core as wm_core;
 
 pub const TITLEBAR_HEIGHT: u16 = 0;
 pub const DRAG_BUTTON: Button = 1;
+pub const USER_FONT: &str = "FiraCode Nerd Font-12";
 
 pub fn run<C>(x_reply: (C, usize)) -> WmReply<()>
 where

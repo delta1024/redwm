@@ -1,6 +1,6 @@
 use crate::{
     define_window_event_request, imports::*, match_event_request, traits::*,
-    DRAG_BUTTON, TITLEBAR_HEIGHT,
+    DRAG_BUTTON, TITLEBAR_HEIGHT, USER_FONT,
 };
 use std::cell::RefCell;
 use std::cmp::Reverse;
@@ -43,7 +43,7 @@ where
             let screen = &conn.setup().roots[screen_num];
             black_gc = conn.generate_id()?;
             let font = conn.generate_id()?;
-            conn.open_font(font, b"9x15")?;
+            conn.open_font(font, USER_FONT.as_bytes())?;
 
             let gc_aux = CreateGCAux::new()
                 .graphics_exposures(0)
